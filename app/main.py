@@ -1,12 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from typing import List
-from app.schemas import Task, TaskCreate, TaskStatus
+from app.schemas import Task, TaskCreate
+from app import crud
 
 app = FastAPI(title="Task Management API")
-
-# In-memory database
-tasks_db: List[Task] = []
-task_id_counter = 1
 
 
 @app.get("/")
@@ -21,39 +18,33 @@ def health_check():
 
 @app.post("/tasks", response_model=Task)
 def create_task(task: TaskCreate):
-    global task_id_counter
-    new_task = Task(id=task_id_counter, **task.dict())
-    tasks_db.append(new_task)
-    task_id_counter += 1
-    return new_task
+    return crud.create_task(task)
 
 
 @app.get("/tasks", response_model=List[Task])
 def get_all_tasks():
-    return tasks_db
+    return crud.get_all_tasks()
 
 
 @app.get("/tasks/{task_id}", response_model=Task)
 def get_task(task_id: int):
-    for task in tasks_db:
-        if task.id == task_id:
-            return task
-    raise HTTPException(status_code=404, detail="Task not found")
+    task = crud.get_task_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 
 @app.put("/tasks/{task_id}", response_model=Task)
 def update_task(task_id: int, updated_task: TaskCreate):
-    for index, task in enumerate(tasks_db):
-        if task.id == task_id:
-            tasks_db[index] = Task(id=task_id, **updated_task.dict())
-            return tasks_db[index]
-    raise HTTPException(status_code=404, detail="Task not found")
+    task = crud.update_task(task_id, updated_task)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int):
-    for index, task in enumerate(tasks_db):
-        if task.id == task_id:
-            tasks_db.pop(index)
-            return {"message": "Task deleted successfully"}
-    raise HTTPException(status_code=404, detail="Task not found")
+    success = crud.delete_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"message": "Task deleted successfully"}
