@@ -1,41 +1,44 @@
-from typing import List
-from app.schemas import Task, TaskCreate
-
-# Temporary in-memory storage
-tasks_db: List[Task] = []
-task_id_counter = 1
+from sqlalchemy.orm import Session
+from app import models
+from app.schemas import TaskCreate
 
 
-def create_task(task: TaskCreate) -> Task:
-    global task_id_counter
-    new_task = Task(id=task_id_counter, **task.dict())
-    tasks_db.append(new_task)
-    task_id_counter += 1
-    return new_task
+def create_task(db: Session, task: TaskCreate):
+    db_task = models.Task(
+        title=task.title,
+        description=task.description,
+        status=task.status
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
 
 
-def get_all_tasks() -> List[Task]:
-    return tasks_db
+def get_all_tasks(db: Session):
+    return db.query(models.Task).all()
 
 
-def get_task_by_id(task_id: int) -> Task | None:
-    for task in tasks_db:
-        if task.id == task_id:
-            return task
-    return None
+def get_task_by_id(db: Session, task_id: int):
+    return db.query(models.Task).filter(models.Task.id == task_id).first()
 
 
-def update_task(task_id: int, updated_task: TaskCreate) -> Task | None:
-    for index, task in enumerate(tasks_db):
-        if task.id == task_id:
-            tasks_db[index] = Task(id=task_id, **updated_task.dict())
-            return tasks_db[index]
-    return None
+def update_task(db: Session, task_id: int, updated_task: TaskCreate):
+    task = get_task_by_id(db, task_id)
+    if not task:
+        return None
+    task.title = updated_task.title
+    task.description = updated_task.description
+    task.status = updated_task.status
+    db.commit()
+    db.refresh(task)
+    return task
 
 
-def delete_task(task_id: int) -> bool:
-    for index, task in enumerate(tasks_db):
-        if task.id == task_id:
-            tasks_db.pop(index)
-            return True
-    return False
+def delete_task(db: Session, task_id: int):
+    task = get_task_by_id(db, task_id)
+    if not task:
+        return False
+    db.delete(task)
+    db.commit()
+    return True
